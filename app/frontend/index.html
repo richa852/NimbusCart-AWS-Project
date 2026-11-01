@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NimbusCart</title>
+<style>
+  :root { color-scheme: light; }
+  body {
+    font-family: -apple-system, Segoe UI, Roboto, sans-serif;
+    max-width: 720px;
+    margin: 40px auto;
+    padding: 0 20px;
+    color: #1c1c1c;
+  }
+  h1 { margin-bottom: 4px; }
+  p.sub { color: #666; margin-top: 0; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+  }
+  th, td {
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid #e2e2e2;
+  }
+  th { background: #f5f5f5; }
+  form {
+    margin-top: 28px;
+    padding: 16px;
+    border: 1px solid #e2e2e2;
+    border-radius: 8px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+  }
+  form div { display: flex; flex-direction: column; }
+  label { font-size: 12px; color: #555; margin-bottom: 4px; }
+  input {
+    padding: 6px 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    width: 120px;
+  }
+  button {
+    padding: 8px 16px;
+    background: #2b2b2b;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  button:hover { background: #444; }
+  #error {
+    display: none;
+    margin-top: 16px;
+    padding: 10px 14px;
+    background: #fdecea;
+    color: #9c1c1c;
+    border: 1px solid #f5c6c2;
+    border-radius: 6px;
+  }
+</style>
+</head>
+<body>
+
+<h1>NimbusCart</h1>
+<p class="sub">Product catalog — Web tier (nginx) → App tier (Flask API) → Data tier (PostgreSQL)</p>
+
+<table id="itemsTable">
+  <thead>
+    <tr><th>ID</th><th>Name</th><th>Price</th><th>Stock</th></tr>
+  </thead>
+  <tbody id="itemsBody">
+    <tr><td colspan="4">Loading…</td></tr>
+  </tbody>
+</table>
+
+<div id="error"></div>
+
+<form id="addForm">
+  <div>
+    <label for="name">Name</label>
+    <input id="name" name="name" required>
+  </div>
+  <div>
+    <label for="price">Price</label>
+    <input id="price" name="price" type="number" step="0.01" required>
+  </div>
+  <div>
+    <label for="stock">Stock</label>
+    <input id="stock" name="stock" type="number" required>
+  </div>
+  <button type="submit">Add product</button>
+</form>
+
+<script>
+const API_BASE = "/api";
+const tableBody = document.getElementById("itemsBody");
+const errorBox = document.getElementById("error");
+const form = document.getElementById("addForm");
+
+function showError(message) {
+  errorBox.textContent = message;
+  errorBox.style.display = "block";
+}
+
+function clearError() {
+  errorBox.style.display = "none";
+  errorBox.textContent = "";
+}
+
+function renderItems(items) {
+  if (!items.length) {
+    tableBody.innerHTML = '<tr><td colspan="4">No products yet.</td></tr>';
+    return;
+  }
+  tableBody.innerHTML = items.map(item => `
+    <tr>
+      <td>${item.id}</td>
+      <td>${item.name}</td>
+      <td>${Number(item.price).toFixed(2)}</td>
+      <td>${item.stock}</td>
+    </tr>
+  `).join("");
+}
+
+async function loadItems() {
+  try {
+    const res = await fetch(`${API_BASE}/items`);
+    if (!res.ok) throw new Error(`API returned ${res.status}`);
+    const items = await res.json();
+    clearError();
+    renderItems(items);
+  } catch (err) {
+    showError(`Could not load products: ${err.message}`);
+    tableBody.innerHTML = "";
+  }
+}
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const payload = {
+    name: document.getElementById("name").value,
+    price: parseFloat(document.getElementById("price").value),
+    stock: parseInt(document.getElementById("stock").value, 10),
+  };
+  try {
+    const res = await fetch(`${API_BASE}/items`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(`API returned ${res.status}`);
+    clearError();
+    form.reset();
+    await loadItems();
+  } catch (err) {
+    showError(`Could not add product: ${err.message}`);
+  }
+});
+
+loadItems();
+</script>
+
+</body>
+</html>
